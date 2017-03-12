@@ -43,49 +43,49 @@ const gameControl = (game, firstSocket, secondSocket, room, quizzes, firstPlayer
         } else {
             setTimeout(() => {
                 redisClient.get('score of ' + firstSocket.id, (error, firstPlayerScore) => {
-                redisClient.get('score of ' + secondSocket.id, (error, secondPlayerScore) => {
-                    firstPlayerScore = firstPlayerScore ? firstPlayerScore : 0;
-                    secondPlayerScore = secondPlayerScore ? secondPlayerScore : 0;
-                    firstSocket.emit('game end', { selfScore: firstPlayerScore, opponentScore: secondPlayerScore, selfData: firstPlayerData, opponentData: secondPlayerData });
-                    secondSocket.emit('game end', { selfScore: secondPlayerScore, opponentScore: firstPlayerScore, selfData: secondPlayerData, opponentData: firstPlayerData });             
-                    // TODO: Save result of two players
-                    // console.log(firstPlayerScore);
-                    // console.log(secondPlayerScore);
-                    let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
-                    let level = calculateLevel(score);
-                    redisClient.smembers('passed words of ' + socket.id, (err, passedWords) => {
-                        redisClient.smembers('failed words of ' + socket.id, (err, failedWords) => {
-                            User.updateAsync({
-                                _id: firstPlayerData._id
+                    redisClient.get('score of ' + secondSocket.id, (error, secondPlayerScore) => {
+                        firstPlayerScore = firstPlayerScore ? firstPlayerScore : 0;
+                        secondPlayerScore = secondPlayerScore ? secondPlayerScore : 0;
+                        firstSocket.emit('game end', { selfScore: firstPlayerScore, opponentScore: secondPlayerScore, selfData: firstPlayerData, opponentData: secondPlayerData });
+                        secondSocket.emit('game end', { selfScore: secondPlayerScore, opponentScore: firstPlayerScore, selfData: secondPlayerData, opponentData: firstPlayerData });             
+                        // TODO: Save result of two players
+                        // console.log(firstPlayerScore);
+                        // console.log(secondPlayerScore);
+                        let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
+                        let level = calculateLevel(score);
+                        // redisClient.smembers('passed words of ' + socket.id, (err, passedWords) => {
+                        //     redisClient.smembers('failed words of ' + socket.id, (err, failedWords) => {
+                        User.updateAsync({
+                            _id: firstPlayerData._id
+                        }, {
+                            score: score,
+                            level: level
+                            // TODO: Update words here
+                            // TODO: Update awards here
+                        })
+                        .then(result => {
+                            // console.log('player 1 result: ' + result);
+                            let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
+                            let level = calculateLevel(score);
+                            return User.updateAsync({
+                                _id: secondPlayerData._id
                             }, {
                                 score: score,
                                 level: level
                                 // TODO: Update words here
                                 // TODO: Update awards here
-                            })
-                            .then(result => {
-                                // console.log('player 1 result: ' + result);
-                                let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
-                                let level = calculateLevel(score);
-                                return User.updateAsync({
-                                    _id: secondPlayerData._id
-                                }, {
-                                    score: score,
-                                    level: level
-                                    // TODO: Update words here
-                                    // TODO: Update awards here
-                                });
-                            })
-                            .then(result => {
-                                // console.log('player 2 result: ' + result);
-                            })
-                            .catch(err => {
-                                console.log(err);
                             });
+                        })
+                        .then(result => {
+                            // console.log('player 2 result: ' + result);
+                        })
+                        .catch(err => {
+                            console.log(err);
                         });
-                    });
+                    });        
                 });
-            });
+            //     });
+            // });
             }, (quizzes[currentQuizIdx - 1].duration + 1) * 1000);
         }
     };
