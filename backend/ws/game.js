@@ -53,46 +53,64 @@ const gameControl = (game, firstSocket, secondSocket, room, quizzes, firstPlayer
                     // console.log(secondPlayerScore);
                     let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
                     let level = calculateLevel(score);
-                    User.updateAsync({
-                        _id: firstPlayerData._id
-                    }, {
-                        score: score,
-                        level: level
-                        // TODO: Update words here
-                        // TODO: Update awards here
-                    })
-                    .then(result => {
-                        // console.log('player 1 result: ' + result);
-                        let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
-                        let level = calculateLevel(score);
-                        return User.updateAsync({
-                            _id: secondPlayerData._id
-                        }, {
-                            score: score,
-                            level: level
-                            // TODO: Update words here
-                            // TODO: Update awards here
+                    redisClient.smembers('passed words of ' + socket.id, (err, passedWords) => {
+                        redisClient.smembers('failed words of ' + socket.id, (err, failedWords) => {
+                            User.updateAsync({
+                                _id: firstPlayerData._id
+                            }, {
+                                score: score,
+                                level: level
+                                // TODO: Update words here
+                                // TODO: Update awards here
+                            })
+                            .then(result => {
+                                // console.log('player 1 result: ' + result);
+                                let score = parseInt(firstPlayerData.score ? firstPlayerData.score : 0) + parseInt(firstPlayerScore);
+                                let level = calculateLevel(score);
+                                return User.updateAsync({
+                                    _id: secondPlayerData._id
+                                }, {
+                                    score: score,
+                                    level: level
+                                    // TODO: Update words here
+                                    // TODO: Update awards here
+                                });
+                            })
+                            .then(result => {
+                                // console.log('player 2 result: ' + result);
+                            })
+                            .catch(err => {
+                                console.log(err);
+                            });
                         });
-                    })
-                    .then(result => {
-                        // console.log('player 2 result: ' + result);
-                    })
-                    .catch(err => {
-                        console.log(err);
                     });
                 });
             });
             }, (quizzes[currentQuizIdx - 1].duration + 1) * 1000);
         }
     };
+    let ready1 = 0;
+    let ready2 = 0;
+    const startGame = () => {
+        if (ready1 && ready2) {
+            game.to(room).emit('new words');
+            setTimeout(() => {
+                game.to(room).emit('quiz start');
+                setTimeout(() => {
+                    nextQuiz();
+                }, 3000);
+            }, 11000);
+        }
+    };
+    firstSocket.on('download done', () => {
+        ready1 = 1;
+        startGame();
+    });
 
-    setTimeout(() => {
-        game.to(room).emit('quiz start');
-        setTimeout(() => {
-            nextQuiz();
-        }, 3000);
-    }, 11000);
-
+    secondSocket.on('download done', () => {
+        ready2 = 1;
+        startGame();
+    });
 
     const socketPlayerHandler = (socket) => {
 
@@ -218,105 +236,6 @@ module.exports = (game) => {
             });
         socket.on('disconnect', () => {
             console.log('User ' + socket.id.toString() + " disconnected");
-            redisClient.smembers('passed words of ' + socket.id, (err, passedWords) => {
-                redisClient.smembers('failed words of ' + socket.id, (err, failedWords) => {
-                    // passedWords = JSON.parse(passedWords);
-                    // failedWords = JSON.parse(failedWords);
-                    if (passedWords.length || failedWords.length) {
-                        // console.log('Passed words: ' + passedWords.toString());
-                        // console.log('Failed words: ' + failedWords.toString());
-                        // console.log(passedWords.length);
-                        // console.log(failedWords.length);
-                        User.findOneAndUpdate({
-                            _id: socket.decoded_token._id,
-                            'passedWords._id': {
-                                $in: passedWords
-                            }
-                        }, {
-                            $inc: {
-                                'passedWords.count': 1,
-                            }
-                        }, { upsert: true, multi: true})
-                        .then(result => {
-                            console.log('UPDATE PASSED RESULT---- ' + result);
-                            User.findOneAndUpdate({
-                                _id: socket.decoded_token._id,
-                                'failedWords._id': {
-                                    $in: failedWords
-                                }
-                            }, {
-                                $inc: {
-                                    'failedWords.count': 1,
-                                }
-                            }, { upsert: true, multi: true})
-                            .then(result => {
-                                console.log('UPDATE FAILED RESULT---- ' + result);
-                            });
-                        })
-                        // passedWords.forEach(word => {
-                        //     User.findOne({
-                        //         _id: socket.decoded_token._id,
-                        //         'passedWords._id': word
-                        //     })
-                        //     .then(user => {
-                        //         if (user) {
-                        //             user.update({
-                        //                 $inc: {
-                        //                     'passedWords.count': 1,
-                        //                 }
-                        //             }).exec();
-                        //         } else {
-                        //             User.update({
-                        //                 _id: socket.decoded_token._id
-                        //             }, {
-                        //                 $push: {
-                        //                     passedWords: {
-                        //                         _id: word,
-                        //                         count: 1
-                        //                     }
-                        //                 }
-                        //             }).exec();
-                        //         }
-                        //     })
-                        //     .catch(err => {
-                        //         if (err) console.log(err);
-                        //     });
-                        // });
-                        // failedWords.forEach(word => {
-                        //     User.findOne({
-                        //         _id: socket.decoded_token._id,
-                        //         'failedWords._id': word
-                        //     })
-                        //     .then(user => {
-                        //         if (user) {
-                        //             User.findOneAndUpdate({
-                        //                 _id: socket.decoded_token._id,
-                        //                 'failedWords._id': word
-                        //             }, {
-                        //                 $inc: {
-                        //                     'failedWords.$.count': 1,
-                        //                 }
-                        //             }).exec();
-                        //         } else {
-                        //             User.update({
-                        //                 _id: socket.decoded_token._id
-                        //             }, {
-                        //                 $push: {
-                        //                     failedWords: {
-                        //                         _id: word,
-                        //                         count: 1
-                        //                     }
-                        //                 }
-                        //             }).exec();
-                        //         }
-                        //     })
-                        .catch(err => {
-                            if (err) console.log(err);
-                        });
-                        // });
-                    }
-                });
-            });
             redisClient.srem('listWaitingPlayers', socket.id, (error) => {
                 if (error) {
                     console.log(error);
